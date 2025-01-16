@@ -1,4 +1,0 @@
-﻿  string-test.cpp
-D:\Github\Cpp\Bit Three\Bit Three\string-test.cpp(12,15): error C2664: “char *strcpy(char *,const char *)”: 无法将参数 1 从“const char *”转换为“char *”
-D:\Github\Cpp\Bit Three\Bit Three\string-test.cpp(12,9): message : 转换丢失限定符
-D:\Windows Kits\10\Include\10.0.19041.0\ucrt\string.h(130,1): message : 参见“strcpy”的声明
