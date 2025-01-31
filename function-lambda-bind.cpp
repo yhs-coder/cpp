@@ -234,6 +234,7 @@ void trigger_event(Callback cb, int value) {
 }
 
 void test_function_usecase() {
+
     // 使用lambda作为回调
     trigger_event([](int value){
         std::cout << "事件触发，value: " << value << std::endl;
@@ -247,6 +248,20 @@ void test_function_usecase() {
     } printer;
     trigger_event(printer, 100);
 }
+
+// std::function应用场景2: 存储和调用不同类型的可调用对象
+void test_function_usecase2() {
+    std::vector<std::function<int(int, int)>> operations;
+    operations.emplace_back(add);
+    operations.emplace_back(Multiply());
+    operations.emplace_back([](int a, int b) {
+        return a -b;
+    });
+    for (auto &op : operations) {
+        std::cout << op(5, 10) << std::endl;
+    }
+}
+
 
 void test_bind() {
     // 1. std::bind绑定部分参数
@@ -263,7 +278,8 @@ int main() {
 //    test_bind();
 //    int arr[] = {1,2,3,4};
 
-    test_function_usecase();
+//    test_function_usecase();
+    test_function_usecase2();
 
     return 0;
 }
