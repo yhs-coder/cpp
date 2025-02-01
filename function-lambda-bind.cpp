@@ -262,11 +262,34 @@ void test_function_usecase2() {
     }
 }
 
+void display(const std::string& msg, int count) {
+    for (int i = 0; i < count; ++i) {
+        std::cout << msg << std::endl;
+    }
+}
+
+void print(int a, int b, int c) {
+    std::cout << "print: a: " << a << ", b: " << b << ", c: " << c << std::endl;
+}
+
 
 void test_bind() {
-    // 1. std::bind绑定部分参数
-    auto bind_add = std::bind(add, 5, std::placeholders::_1);
-    cout << "bind_add : 5 + 10 =  " << bind_add(10) << endl;
+    // 1. std::bind绑定add的第一个参数，生成新的函数对象
+    auto new_add = std::bind(add, 10, std::placeholders::_1);
+    cout << "new_add(5) = " << new_add(5) << endl; // 5传给add的第二个参数
+
+    // 2. std::placeholders占位符
+    // 绑定msg为"hello", 使用std::placeholders进行占位
+    auto say_hello= std::bind(display, "hello", std::placeholders::_1);
+    say_hello(2); // 2传给display的第二个参数
+
+    // 绑定count次数为2，生成新的函数对象
+    auto say_twice = std::bind(display, std::placeholders::_1, 2);
+    say_twice("hi"); // "hello"传给display的未绑定的第一个参数
+
+    // 新生成函数的第三个参数,绑定到原来函数的第一个位置，同理将新生成函数第一个参数，绑定到原来函数的第三个位置
+    auto new_func = std::bind(print, std::placeholders::_3, std::placeholders::_2, std::placeholders::_1);
+    new_func(1, 2, 3);
 }
 
 
@@ -275,11 +298,10 @@ int main() {
 //    test_functor();
 //    test_lambda();
 //    test_function();
-//    test_bind();
-//    int arr[] = {1,2,3,4};
 
 //    test_function_usecase();
-    test_function_usecase2();
+//    test_function_usecase2();
+    test_bind();
 
     return 0;
 }
