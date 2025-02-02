@@ -272,6 +272,29 @@ void print(int a, int b, int c) {
     std::cout << "print: a: " << a << ", b: " << b << ", c: " << c << std::endl;
 }
 
+class Calculator {
+public:
+    Calculator() : result(0) {}
+    int result;
+    int multiply(int a, int b) {
+        result = a * b;
+        return result;
+    }
+};
+
+class Greeter {
+public:
+    void greet(const std::string& name) const {
+        std::cout << "hello, " << name  << "!" << std::endl;
+    }
+};
+
+class Logger {
+public:
+    static void log(const std::string& message) {
+        std::cout << "log: " << message << std::endl;
+    }
+};
 
 void test_bind() {
     // 1. std::bind绑定add的第一个参数，生成新的函数对象
@@ -290,6 +313,42 @@ void test_bind() {
     // 新生成函数的第三个参数,绑定到原来函数的第一个位置，同理将新生成函数第一个参数，绑定到原来函数的第三个位置
     auto new_func = std::bind(print, std::placeholders::_3, std::placeholders::_2, std::placeholders::_1);
     new_func(1, 2, 3);
+
+    // 使用lamdba表达式绑定参数 (更为直观和高效，比较常用)
+    // 绑定第一个参数为2
+    auto new_func3 = [] (int b) {
+        return add(2, b);
+    };
+    std::cout << "new_func3(5) = " << new_func3(5) << std::endl;
+
+    // 绑定类的成员函数
+    // 方式一: 使用std::bind绑定成员函数
+    Calculator calc;
+    // 注意：需要在成员函数和对象前加&, 并且需要绑定到一个对象实例上来调用
+    auto new_func4 = std::bind(&Calculator::multiply, &calc, 2, std::placeholders::_1);
+    std::cout << "new_func4(5) = " << new_func4(5) << std::endl;
+
+    // 使用lambda表达式绑定成员函数
+    // 绑定对象实例
+    auto new_func5 = [&calc](int a){
+        return calc.multiply(2, a);
+    };
+    std::cout << "new_func5(5) = " << new_func5(5) << std::endl;
+
+
+    Greeter greeter;
+    auto new_func6 = [&greeter](const std::string& name){
+        greeter.greet(name);
+    };
+    new_func6("world");
+
+    // 绑定静态成员函数
+    auto log_func = std::bind(&Logger::log, std::placeholders::_1);
+    log_func("This is a static log message.");
+    auto log_func2 = [](const std::string& message) {
+        Logger::log(message);
+    };
+    log_func2("This is a static log message.");
 }
 
 
