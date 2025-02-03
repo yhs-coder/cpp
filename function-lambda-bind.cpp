@@ -328,8 +328,8 @@ void test_bind() {
     auto new_func4 = std::bind(&Calculator::multiply, &calc, 2, std::placeholders::_1);
     std::cout << "new_func4(5) = " << new_func4(5) << std::endl;
 
-    // 使用lambda表达式绑定成员函数
-    // 绑定对象实例
+    // 方式二： 使用lambda表达式绑定成员函数
+    // 捕获对象实例
     auto new_func5 = [&calc](int a){
         return calc.multiply(2, a);
     };
