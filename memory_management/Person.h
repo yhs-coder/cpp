@@ -1,7 +1,3 @@
-//
-// Created by yhs on 2025-02-08.
-//
-
 #ifndef PERSON_H
 #define PERSON_H
 #include <string>

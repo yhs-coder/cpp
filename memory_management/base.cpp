@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include "Person.h"
 #include "DynamicArray.h"
+#include "MemoryPool.h"
 
 // C风格内存管理: 使用malloc和free进行内存管理
 void test_malloc_free() {
@@ -130,10 +131,49 @@ void test_dynamic_array() {
 
 }
 
+// 简易内存池
+void test_memory_pool() {
+    try {
+        MemoryPool pool(sizeof(Person), 3);
+        std::cout << "内存池上可用的内存块: " << pool.size() << std::endl;
+        void *mem1 = pool.allocate();
+        std::cout << "内存池上可用的内存块: " << pool.size() << std::endl;
+        void *mem2 = pool.allocate();
+        void *mem3 = pool.allocate();
+//        void *mem4 = pool.allocate(); // 内存池无可用内存块，抛出异常
+
+        // 使用 "定位new" 在预分配的内存上构造对象
+        auto obj1 = new(mem1) Person("tom", 10);
+        auto obj2 = new(mem2) Person("jack", 20);
+        auto obj3 = new(mem3) Person("alice", 30);
+//        auto obj4 = new(mem4) Person("bob", 40);
+        std::cout << "obj1: " << obj1->_name << " " << obj1->_age << std::endl;
+        std::cout << "obj2: " << obj2->_name << " " << obj2->_age << std::endl;
+        std::cout << "obj3: " << obj3->_name << " " << obj3->_age << std::endl;
+//        std::cout << "obj4: " << obj4->_name << " " << obj4->_age << std::endl;
+
+        // 显式调用析构函数，清理内存池上对应的对象
+        obj1->~Person();
+        obj2->~Person();
+        obj3->~Person();
+//        std::cout << "内存池上可用的内存块: " << pool.size() << std::endl;
+        // 回收内存块
+        pool.deallocate(mem1);
+        std::cout << "deallocate回收内存，此时内存池上可用的内存块: " << pool.size() << std::endl;
+
+        pool.deallocate(mem2);
+        pool.deallocate(mem3);
+
+    } catch(const std::bad_alloc &e){
+        std::cout << "Memory allocation failed: " << e.what() << std::endl;
+    }
+}
+
 int main() {
 //    test_malloc_free();
 //    test_realloc();
-    test_new_delete();
+//    test_new_delete();
 //    test_dynamic_array();
+    test_memory_pool();
     return 0;
 }
