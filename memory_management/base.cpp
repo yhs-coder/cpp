@@ -4,9 +4,11 @@
 
 #include <iostream>
 #include <cstdlib>
+#include <thread>
 #include "Person.h"
 #include "DynamicArray.h"
 #include "MemoryPool.h"
+#include "SimpleSharedPtr.h"
 
 // C风格内存管理: 使用malloc和free进行内存管理
 void test_malloc_free() {
@@ -142,7 +144,7 @@ void test_memory_pool() {
         void *mem3 = pool.allocate();
 //        void *mem4 = pool.allocate(); // 内存池无可用内存块，抛出异常
 
-        // 使用 "定位new" 在预分配的内存上构造对象
+        // 使用定位new对内存块的对象进行初始化
         auto obj1 = new(mem1) Person("tom", 10);
         auto obj2 = new(mem2) Person("jack", 20);
         auto obj3 = new(mem3) Person("alice", 30);
@@ -169,11 +171,60 @@ void test_memory_pool() {
     }
 }
 
+// C++内存安全问题
+void test_memory_leak() {
+    // 1. 使用new时没有对应的delete
+    int *p_int = new int(10);
+    std::cout << *p_int << std::endl;
+//    delete p_int;
+
+    // 2. 使用new[]时没有对应的delete[]
+    int *p_arr = new int[4]{1, 2, 3, 4};
+    std::cout << p_arr[0] << std::endl;
+    delete[] p_arr;
+    std::cout << p_arr[0] <<std::endl; // 不会崩溃！非法访问！
+    for (size_t i = 0; i < 4; i++) {
+        std::cout << p_arr[i] << std::endl;
+    }
+}
+
+void test_simple_share_ptr() {
+    std::cout << "Creating default constructed shared_ptr..." << std::endl;
+    SimpleSharedPtr<Person> ptr1;
+    std::cout << "ptr1 use_count: " << ptr1.use_count() << std::endl;  // 0
+
+    std::cout << "Creating shared_ptr from raw pointer..." << std::endl;
+    SimpleSharedPtr<Person> ptr2(new Person("tom", 55));
+    std::cout << "ptr2 use_count: " << ptr2.use_count() << std::endl;  // 1
+
+    std::cout << "Creating shared_ptr from another shared_ptr..." << std::endl;
+    SimpleSharedPtr<Person> ptr3 = ptr2;
+    std::cout << "ptr3 use_count: " << ptr3.use_count() << std::endl;   // 2
+    std::cout << "ptr2 use_count: " << ptr2.use_count() << std::endl;   // 2
+
+    ptr1 = ptr3;
+    std::cout << "ptr1 use_count: " << ptr1.use_count() << std::endl;   // 3
+    std::cout << "ptr3 use_count: " << ptr3.use_count() << std::endl;   // 3
+
+    ptr2.reset(new Person("Ray", 23));
+    std::cout << "ptr2 use_count: " << ptr2.use_count() << std::endl;   // 1
+    std::cout << "ptr3 use_count: " << ptr3.use_count() << std::endl;   // 2
+    std::cout << "ptr1 use_count: " << ptr1.use_count() << std::endl;   // 2
+
+    std::thread t1([ptr2](){
+        ptr2->_name = "Ray in thread";
+    });
+
+    t1.join();
+}
+
 int main() {
 //    test_malloc_free();
 //    test_realloc();
 //    test_new_delete();
 //    test_dynamic_array();
-    test_memory_pool();
+//    test_memory_pool();
+//    test_memory_leak();
+    test_simple_share_ptr();
     return 0;
 }
