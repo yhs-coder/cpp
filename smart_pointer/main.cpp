@@ -53,6 +53,12 @@ void test_shared_ptr() {
     std::cout << "After assign, ptr6 use count: " << ptr6.use_count() << std::endl; // 3
     std::cout << "------------------------------------------------------" << std::endl;
 
+    // 6. 使用reset函数，释放资源
+    ptr6.reset();
+    std::cout << "After reset, ptr4 use count: " << ptr4.use_count() << std::endl; // 2
+    std::cout << "After reset, ptr5 use count: " << ptr5.use_count() << std::endl; // 2
+    ptr6->show();
+
     delete test;
 }
 
