@@ -62,8 +62,36 @@ void test_shared_ptr() {
     delete test;
 }
 
+// unique_ptr用法
+void test_unique_ptr() {
+    //  创建一个 unique_ptr
+    std::unique_ptr<Test> ptr1(new Test(1));
+    ptr1->show();
+
+    // 移动 unique_ptr
+    std::unique_ptr<Test> ptr2 = std::move(ptr1);
+    ptr2->show();
+//    ptr1->show();   // ptr1已经失效，不能使用
+    if (!ptr1) {
+        std::cout << "ptr1 is now nullptr after move." << std::endl;
+    }
+
+    ptr1 = std::unique_ptr<Test>(new Test(2));
+    ptr1->show();
+
+    // // 使用 make_unique（C++14 引入）
+    std::unique_ptr<Test> ptr3 = std::make_unique<Test>(3);
+    ptr3->show();
+
+    // 重置 unique_ptr
+    ptr2.reset(new Test(300));
+    ptr2->show();
+
+// unique_ptr 自动释放资源
+}
 
 int main() {
-    test_shared_ptr();
+//    test_shared_ptr();
+    test_unique_ptr();
     return 0;
 }
