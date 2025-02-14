@@ -17,6 +17,15 @@ private:
     int _value;
 };
 
+struct FileDeleter {
+    void operator()(FILE* fp) {
+        if (fp) {
+            std::cout << "Close file successfully." << std::endl;
+            fclose(fp);
+        }
+    }
+};
+
 
 // shared_ptr用法
 void test_shared_ptr() {
@@ -90,8 +99,20 @@ void test_unique_ptr() {
 // unique_ptr 自动释放资源
 }
 
+// 自定义删除器
+void test_deleter() {
+    {
+        std::shared_ptr<FILE> file_ptr(fopen("test.txt", "w"), FileDeleter());
+        if (file_ptr) {
+            std::cout << "File opened successfully." << std::endl;
+            fprintf(file_ptr.get(), "hello, world!\n");
+        }
+    }
+}
+
 int main() {
 //    test_shared_ptr();
-    test_unique_ptr();
+//    test_unique_ptr();
+    test_deleter();
     return 0;
 }
