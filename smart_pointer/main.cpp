@@ -108,6 +108,21 @@ void test_deleter() {
             fprintf(file_ptr.get(), "hello, world!\n");
         }
     }
+
+    {
+        auto file_deleter = [](FILE *fp) {
+            if (fp) {
+                std::cout << "Close file successfully." << std::endl;
+                fclose(fp);
+            }
+        };
+
+        std::unique_ptr<FILE,decltype(file_deleter)> file_ptr(fopen("test.txt", "w"), file_deleter);
+        if (file_ptr) {
+            std::cout << "File opened successfully." << std::endl;
+            fprintf(file_ptr.get(), "try everything!\n");
+        }
+    }
 }
 
 int main() {
