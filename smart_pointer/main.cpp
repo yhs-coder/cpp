@@ -125,9 +125,36 @@ void test_deleter() {
     }
 }
 
+// shared_ptr循环引用问题
+struct ListNode {
+    int dada;
+    std::shared_ptr<ListNode> prev;
+//    std::shared_ptr<ListNode> next;
+    std::weak_ptr<ListNode> next;   // 使用weak_ptr解决循环引用问题，
+    ~ListNode() {
+        std::cout << "ListNode destructor called." << std::endl;
+    }
+};
+void  test_circular_reference() {
+    std::shared_ptr<ListNode> node1(new ListNode);
+    std::shared_ptr<ListNode> node2(new ListNode);
+    std::cout << node1.use_count() << std::endl;    // 1
+    std::cout << node2.use_count() << std::endl;    // 1
+    node1->next = node2;
+    node2->prev = node1;
+
+    std::cout << node1.use_count() << std::endl;    // 2
+    std::cout << node2.use_count() << std::endl;    // 1
+
+    std::cout << "exit......" << std::endl;
+}
+
+
 int main() {
 //    test_shared_ptr();
 //    test_unique_ptr();
-    test_deleter();
+//    test_deleter();
+    test_circular_reference();
+
     return 0;
 }
