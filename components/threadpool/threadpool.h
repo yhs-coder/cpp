@@ -13,6 +13,7 @@
 #include <condition_variable>
 #include <functional>
 #include <thread>
+#include <chrono>
 
 
 // 任务抽象基类
@@ -65,9 +66,9 @@ public:
     void SubmitTask(std::shared_ptr<Task> sp);
 
     // 定义线程函数
-    void ThreadEntry();
+    [[noreturn]] void ThreadEntry();
 private:
-    std::vector<std::unique_ptr<Thread>> threads_;                  // 线程池中的线程列表
+    std::vector<std::unique_ptr<Thread>> threads_;  // 线程池中的线程列表
     size_t init_thread_size_;                       // 初始的线程数量
 
     std::queue<std::shared_ptr<Task>> task_queue_;  // 任务队列,使用智能指针管理传入的对象，自动释放资源
