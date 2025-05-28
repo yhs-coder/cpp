@@ -5,22 +5,69 @@
 #ifndef THREADPOOL_H
 #define THREADPOOL_H
 
-#include <vector>
-#include <queue>
-#include <memory>
 #include <atomic>
-#include <mutex>
+#include <chrono>
 #include <condition_variable>
 #include <functional>
+#include <memory>
+#include <mutex>
+#include <queue>
 #include <thread>
-#include <chrono>
+#include <vector>
 
+// Any类型: 可以接收任意数据的类型
+class Any {
+public:
+    // 构造函数可以让Any类型接收任意其它的数据
+    template <typename DataType>
+    Any(DataType data) : base_(std::make_unique<Derive<DataType>>(data)) {}
 
+    Any() = default;
+    ~Any() = default;
+    Any(const Any&) = delete;
+    Any& operator=(const Any&) = delete;
+    Any(Any&&) = default;
+    Any& operator=(Any&&) = default;
+
+    // 将Any对象里面存储的data数据提取出来
+    template<typename DataType>
+    DataType Cast_() {
+        auto dp = dynamic_cast<Derive<DataType>*>(base_.get());
+        if (dp == nullptr) {
+            throw "type is unmatch!";
+        }
+        return dp->data_;
+    }
+
+private:
+    // 基类类型
+    class Base {
+    public:
+        // 基类和派生类的析构函数经过编译器处理后统一命名为destructor
+        // 如果不声明为虚函数,那么delete了Base时,不会调用Derive的析构函数
+        virtual ~Base() = default;
+    };
+
+    // 派生类类型
+    template<typename T>
+    class Derive : public Base {
+    public:
+        Derive(T data) : data_(data) {}
+        ~Derive() = default;
+    private:
+        // 接收任意类型的数据
+        T data_;
+    };
+
+private:
+    // 基类指针,指向Derive派生类,从而可以获取Derive类中的data数据
+    std::unique_ptr<Base> base_;
+};
 // 任务抽象基类
 class Task {
 public:
     // 用户可以自定义任意任务类型，从Task抽象基类继承，重写Run方法，实现自定义任务处理
-    virtual void Run() = 0;
+    virtual Any Run() = 0;
 };
 
 // 线程类型
@@ -33,22 +80,33 @@ public:
 
     // 启动线程
     void Start();
+
 private:
     ThreadFunc func_;
 };
 
 // 线程池支持的模式
 enum class PoolMode {
-    MODE_FIXED,     // 固定线程数
-    MODE_CACHED,    // 线程数量可动态增长
+    MODE_FIXED, // 固定线程数
+    MODE_CACHED,// 线程数量可动态增长
 };
 
+/*
+ * example:
+ * ThreadPool pool;
+ * pool.start(4);
+ * class MyTask : public Task {
+ *     void Run() { // 任务代码}
+ * };
+ * pool.SubmitTask(new MyTask());
+ * // 或者pool.SubmitTask(std::make_shared<MyTask>());
+ */
 class ThreadPool {
 public:
     ThreadPool();
     ~ThreadPool();
-    ThreadPool(const ThreadPool&)  = delete;
-    ThreadPool& operator= (const ThreadPool) = delete;
+    ThreadPool(const ThreadPool&) = delete;
+    ThreadPool& operator=(const ThreadPool) = delete;
 
     // 设置线程池的工作模式
     void SetMode(PoolMode mode);
@@ -67,20 +125,21 @@ public:
 
     // 定义线程函数
     [[noreturn]] void ThreadEntry();
+
 private:
-    std::vector<std::unique_ptr<Thread>> threads_;  // 线程池中的线程列表
-    size_t init_thread_size_;                       // 初始的线程数量
+    std::vector<std::unique_ptr<Thread>> threads_;// 线程池中的线程列表
+    size_t init_thread_size_;                     // 初始的线程数量
 
-    std::queue<std::shared_ptr<Task>> task_queue_;  // 任务队列,使用智能指针管理传入的对象，自动释放资源
-    std::atomic_uint task_size_;                    // 任务数量
-    size_t task_queue_threshold_;                   // 任务队列的阈值
+    std::queue<std::shared_ptr<Task>> task_queue_;// 任务队列,使用智能指针管理传入的对象，自动释放资源
+    std::atomic_uint task_size_;                  // 任务数量
+    size_t task_queue_threshold_;                 // 任务队列的阈值
 
-    std::mutex task_queue_mutex_;                   // 任务队列的互斥锁，保证任务列队的线程安全
-    std::condition_variable not_full_;              // 任务队列非满条件变量
-    std::condition_variable not_empty_;             // 任务队列非空条件变量
+    std::mutex task_queue_mutex_;      // 任务队列的互斥锁，保证任务列队的线程安全
+    std::condition_variable not_full_; // 任务队列非满条件变量
+    std::condition_variable not_empty_;// 任务队列非空条件变量
 
-    PoolMode pool_mode_;                            // 线程池的工作模式
+    PoolMode pool_mode_;// 线程池的工作模式
 };
 
 
-#endif //THREADPOOL_H
+#endif//THREADPOOL_H
