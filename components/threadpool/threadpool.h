@@ -63,11 +63,52 @@ private:
     // 基类指针,指向Derive派生类,从而可以获取Derive类中的data数据
     std::unique_ptr<Base> base_;
 };
+
+class Result;   // Result类的前置声明
+
 // 任务抽象基类
 class Task {
 public:
+    Task();
+    ~Task() = default;
+    void Exec();
+    void SetResult(Result* res);
+
     // 用户可以自定义任意任务类型，从Task抽象基类继承，重写Run方法，实现自定义任务处理
     virtual Any Run() = 0;
+
+private:
+    Result* result_;    // 使用裸指针指向Result对象， Result对象的生命周期要 大于 Task
+};
+
+// 实现一个信号量类
+class Semaphore {
+public:
+    Semaphore(int resource_limit = 0);
+    ~Semaphore() = default;
+
+    // 获取一个信号量资源
+    void wait();
+
+    // 增加一个信号量资源
+    void post();
+
+private:
+    int resource_limit_;    // 信号量资源
+    std::mutex mtx_;
+    std::condition_variable condition_;
+};
+
+// Result类, 用于接收提交到线程池的task任务执行完成后的返回值类型
+class Result {
+public:
+    Result( std::shared_ptr<Task> task, bool is_valid = true);
+    ~Result() = default;
+private:
+    Any any_;                       // 存储任务返回值
+    Semaphore semaphore_;           // 线程通信 - 信号量
+    std::shared_ptr<Task> task_;    // 指向对应获取返回值的任务对象
+    std::atomic_bool is_valid_;     // 判断返回值是否有效
 };
 
 // 线程类型
@@ -121,10 +162,10 @@ public:
     void SetTaskQueueThreshold(size_t threshold);
 
     // 往线程池中提交任务
-    void SubmitTask(std::shared_ptr<Task> sp);
+    Result SubmitTask(std::shared_ptr<Task> sp);
 
     // 定义线程函数
-    [[noreturn]] void ThreadEntry();
+    void ThreadEntry();
 
 private:
     std::vector<std::unique_ptr<Thread>> threads_;// 线程池中的线程列表
