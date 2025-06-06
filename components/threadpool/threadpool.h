@@ -14,6 +14,7 @@
 #include <queue>
 #include <thread>
 #include <vector>
+#include <iostream>
 
 // Any类型: 可以接收任意数据的类型
 class Any {
@@ -32,11 +33,11 @@ public:
     // 将Any对象里面存储的data数据提取出来
     template<typename DataType>
     DataType Cast_() {
-        auto dp = dynamic_cast<Derive<DataType>*>(base_.get());
-        if (dp == nullptr) {
+        auto pd = dynamic_cast<Derive<DataType>*>(base_.get());
+        if (pd == nullptr) {
             throw "type is unmatch!";
         }
-        return dp->data_;
+        return pd->data_;
     }
 
 private:
@@ -54,7 +55,6 @@ private:
     public:
         Derive(T data) : data_(data) {}
         ~Derive() = default;
-    private:
         // 接收任意类型的数据
         T data_;
     };
@@ -88,10 +88,10 @@ public:
     ~Semaphore() = default;
 
     // 获取一个信号量资源
-    void wait();
+    void Wait();
 
     // 增加一个信号量资源
-    void post();
+    void Post();
 
 private:
     int resource_limit_;    // 信号量资源
@@ -104,6 +104,13 @@ class Result {
 public:
     Result( std::shared_ptr<Task> task, bool is_valid = true);
     ~Result() = default;
+
+    // 获取任务执行完的返回值
+    void SetValue(Any any);
+
+    // 返回任务执行完的结果
+    Any Get();
+
 private:
     Any any_;                       // 存储任务返回值
     Semaphore semaphore_;           // 线程通信 - 信号量

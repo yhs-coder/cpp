@@ -6,14 +6,14 @@ const size_t TASK_MAX_THRESHOLD = 4;
 
 Semaphore::Semaphore(int resource_limit) : resource_limit_(resource_limit) {}
 
-void Semaphore::wait() {
+void Semaphore::Wait() {
     std::unique_lock<std::mutex> lock(mtx_);
     // 等待信号量有资源,没有资源遍阻塞当前线程
     condition_.wait(lock, [&]() -> bool { return resource_limit_ > 0; });
     resource_limit_--;
 }
 
-void Semaphore::post() {
+void Semaphore::Post() {
     std::unique_lock<std::mutex> lock(mtx_);
     resource_limit_++;
     condition_.notify_all();
@@ -67,6 +67,8 @@ void ThreadPool::ThreadEntry() {
             std::unique_lock<std::mutex> lock(task_queue_mutex_);
             std::cout << "tid: " << std::this_thread::get_id() << "尝试获取任务..." << std::endl;
 
+            // cached模式下，可能已经创建了很多线程，如果空闲时间超过60s,应该把多余的线程结束回收掉
+
             // 等待not_empty_上的条件满足
             not_empty_.wait(lock, [&]() -> bool { return task_queue_.size() > 0; });
             std::cout << "tid: " << std::this_thread::get_id() << "获取任务成功..." << std::endl;
@@ -88,7 +90,8 @@ void ThreadPool::ThreadEntry() {
 
         // 任务非空时，当前线程才执行这个任务
         if (task != nullptr) {
-            task->Run();
+            // task->Run();
+            task->Exec();
         }
     }
 }
@@ -117,7 +120,7 @@ Result ThreadPool::SubmitTask(std::shared_ptr<Task> sp) {
         })) {
         // 表示not_full_等待了1s后，条件依旧没有满足
         std::cerr << "The task queue is full, submit task failed." << std::endl;
-        return Result(sp,false);
+        return Result(sp, false);
     }
 
     // 如果有空余，将传入的任务插入到任务队列
@@ -126,12 +129,35 @@ Result ThreadPool::SubmitTask(std::shared_ptr<Task> sp) {
 
     // 插入后任务队列非空，在not_empty_上通知线程池分配线程来处理该任务
     not_empty_.notify_all();
+
+    // 需要根据任务数量和空闲线程的数量，判断是否需要创建新的线程出来
+
+    // 返回任务的Result对象
     return Result(sp);
 }
 
 
 /************************* Result类的实现 *************************/
-Result::Result(std::shared_ptr<Task> task, bool is_valid) : task_(task), is_valid_(is_valid) {}
+Result::Result(std::shared_ptr<Task> task, bool is_valid) : task_(task), is_valid_(is_valid) {
+    task_->SetResult(this);
+}
+
+void Result::SetValue(Any any) {
+    // 存储任务执行完的返回值
+    any_ = std::move(any);
+    // 获取到任务的返回值后，增加信号量资源
+    semaphore_.Post();
+}
+
+Any Result::Get() {    // 提供给用户调用
+    if (!is_valid_) {
+        return "";
+    }
+    // 如果task任务没有执行完，在这里阻塞用户的线程
+    semaphore_.Wait();
+    return std::move(any_);
+}
+
 
 /************************* Task类的实现 *************************/
 
@@ -139,6 +165,10 @@ Task::Task() : result_(nullptr) {}
 
 void Task::Exec() {
     if (result_ != nullptr) {
-
+        // 这里发生多态
+        result_->SetValue(Run());
     }
+}
+void Task::SetResult(Result *res) {
+    result_ = res;
 }
