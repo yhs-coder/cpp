@@ -34,6 +34,8 @@ int main() {
 #if 1
     ThreadPool pool;
     // 用户自己设置线程池的工作模式
+    pool.SetMode(PoolMode::MODE_CACHED);
+    // 开始启动线程池
     pool.Start(4);
     Result res1 = pool.SubmitTask(std::make_shared<MyTask>(1, 1000000));
     Result res2 = pool.SubmitTask(std::make_shared<MyTask>(1000001, 2000000));

@@ -3,6 +3,7 @@
 #include <iostream>
 
 const size_t TASK_MAX_THRESHOLD = 4;
+const size_t THREAD_MAX_THRESHOLD = 10;
 
 Semaphore::Semaphore(int resource_limit) : resource_limit_(resource_limit) {}
 
@@ -29,15 +30,24 @@ void Thread::Start() {
 
 ThreadPool::ThreadPool()
     : init_thread_size_(4),
+      idle_thread_size_(0),
+      thread_size_threshold_(THREAD_MAX_THRESHOLD),
+      current_thread_size_(0),
       task_size_(0),
       task_queue_threshold_(TASK_MAX_THRESHOLD),
-      pool_mode_(PoolMode::MODE_FIXED) {}
+      pool_mode_(PoolMode::MODE_FIXED),
+      is_pool_running_(false) {}
 
 ThreadPool::~ThreadPool() {}
 
 void ThreadPool::Start(size_t init_thread_size) {
+    // 设置线程池为运行状态
+    is_pool_running_ = true;
+
     // 记录初始线程个数
     init_thread_size_ = init_thread_size;
+    // 记录当前线程个数
+    current_thread_size_ = init_thread_size;
 
     // 创建线程对象
     for (size_t i = 0; i < init_thread_size_; ++i) {
@@ -53,6 +63,8 @@ void ThreadPool::Start(size_t init_thread_size) {
     for (size_t i = 0; i < init_thread_size_; ++i) {
         // 执行线程函数
         threads_[i]->Start();
+        // 记录初始空闲线程的数量
+        idle_thread_size_++;
     }
 }
 
@@ -71,6 +83,10 @@ void ThreadPool::ThreadEntry() {
 
             // 等待not_empty_上的条件满足
             not_empty_.wait(lock, [&]() -> bool { return task_queue_.size() > 0; });
+
+            // 需要线程处理，空闲线程数量--
+            idle_thread_size_--;
+
             std::cout << "tid: " << std::this_thread::get_id() << "获取任务成功..." << std::endl;
 
             // 取出任务队列的元素，并且任务数量--
@@ -93,15 +109,40 @@ void ThreadPool::ThreadEntry() {
             // task->Run();
             task->Exec();
         }
+        // 当线程处理完任务，空闲线程数量++
+        idle_thread_size_++;
     }
+}
+
+bool ThreadPool::CheckRunningState() const {
+    return is_pool_running_;
 }
 
 void ThreadPool::SetInitThreadSize(size_t size) {
     init_thread_size_ = size;
 }
 
+void ThreadPool::SetMode(PoolMode mode) {
+    // 如果线程池已经在运行，不允许进行设置
+    if (CheckRunningState())
+        return;
+    pool_mode_ = mode;
+}
+
 void ThreadPool::SetTaskQueueThreshold(size_t threshold) {
+    // 如果线程池已经在运行，不允许进行设置
+    if (CheckRunningState())
+        return;
     task_queue_threshold_ = threshold;
+}
+
+void ThreadPool::SetThreadSizeThreshold(size_t threshold) {
+    if (CheckRunningState())
+        return;
+    // 在cached模式下，才可设置线程数量上限阈值
+    if (pool_mode_ == PoolMode::MODE_CACHED) {
+        thread_size_threshold_ = threshold;
+    }
 }
 
 Result ThreadPool::SubmitTask(std::shared_ptr<Task> sp) {
@@ -130,7 +171,15 @@ Result ThreadPool::SubmitTask(std::shared_ptr<Task> sp) {
     // 插入后任务队列非空，在not_empty_上通知线程池分配线程来处理该任务
     not_empty_.notify_all();
 
+    // cached模式，使用场景：适合任务处理比较紧急，小而快的任务。
+    // 但不适合耗时多的任务，因为耗时任务会长时间占用线程，这种情况选择fixed模式
     // 需要根据任务数量和空闲线程的数量，判断是否需要创建新的线程出来
+    if (pool_mode_ == PoolMode::MODE_CACHED
+        && task_size_ > idle_thread_size_
+        && current_thread_size_ < thread_size_threshold_) {
+        auto ptr = std::make_unique<Thread>(std::bind(&ThreadPool::ThreadEntry, this));
+        threads_.emplace_back(std::move(ptr));
+    }
 
     // 返回任务的Result对象
     return Result(sp);

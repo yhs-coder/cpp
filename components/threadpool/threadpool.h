@@ -9,18 +9,18 @@
 #include <chrono>
 #include <condition_variable>
 #include <functional>
+#include <iostream>
 #include <memory>
 #include <mutex>
 #include <queue>
 #include <thread>
 #include <vector>
-#include <iostream>
 
 // Any类型: 可以接收任意数据的类型
 class Any {
 public:
     // 构造函数可以让Any类型接收任意其它的数据
-    template <typename DataType>
+    template<typename DataType>
     Any(DataType data) : base_(std::make_unique<Derive<DataType>>(data)) {}
 
     Any() = default;
@@ -64,7 +64,7 @@ private:
     std::unique_ptr<Base> base_;
 };
 
-class Result;   // Result类的前置声明
+class Result;// Result类的前置声明
 
 // 任务抽象基类
 class Task {
@@ -102,7 +102,7 @@ private:
 // Result类, 用于接收提交到线程池的task任务执行完成后的返回值类型
 class Result {
 public:
-    Result( std::shared_ptr<Task> task, bool is_valid = true);
+    Result(std::shared_ptr<Task> task, bool is_valid = true);
     ~Result() = default;
 
     // 获取任务执行完的返回值
@@ -112,10 +112,10 @@ public:
     Any Get();
 
 private:
-    Any any_;                       // 存储任务返回值
-    Semaphore semaphore_;           // 线程通信 - 信号量
-    std::shared_ptr<Task> task_;    // 指向对应获取返回值的任务对象
-    std::atomic_bool is_valid_;     // 判断返回值是否有效
+    Any any_;                   // 存储任务返回值
+    Semaphore semaphore_;       // 线程通信 - 信号量
+    std::shared_ptr<Task> task_;// 指向对应获取返回值的任务对象
+    std::atomic_bool is_valid_; // 判断返回值是否有效
 };
 
 // 线程类型
@@ -168,25 +168,36 @@ public:
     // 设置task任务队列上限阈值
     void SetTaskQueueThreshold(size_t threshold);
 
+    // 设置线程池cached模式下上限阈值
+    void SetThreadSizeThreshold(size_t threshold);
+
     // 往线程池中提交任务
     Result SubmitTask(std::shared_ptr<Task> sp);
 
+private:
     // 定义线程函数
     void ThreadEntry();
 
+    // 检查线程池的运行状态
+    bool CheckRunningState() const;
+
 private:
-    std::vector<std::unique_ptr<Thread>> threads_;// 线程池中的线程列表
-    size_t init_thread_size_;                     // 初始的线程数量
+    std::vector<std::unique_ptr<Thread>> threads_;  // 线程池中的线程列表
+    size_t init_thread_size_;                       // 初始的线程数量
+    std::atomic_uint idle_thread_size_;             // 记录空闲线程的数量
+    size_t thread_size_threshold_;                  // 线程数量上限阈值
+    std::atomic_uint current_thread_size_;          // 记录当前线程池中线程的总数量
 
-    std::queue<std::shared_ptr<Task>> task_queue_;// 任务队列,使用智能指针管理传入的对象，自动释放资源
-    std::atomic_uint task_size_;                  // 任务数量
-    size_t task_queue_threshold_;                 // 任务队列的阈值
+    std::queue<std::shared_ptr<Task>> task_queue_;  // 任务队列,使用智能指针管理传入的对象，自动释放资源
+    std::atomic_uint task_size_;                    // 任务数量
+    size_t task_queue_threshold_;                   // 任务队列的阈值
 
-    std::mutex task_queue_mutex_;      // 任务队列的互斥锁，保证任务列队的线程安全
-    std::condition_variable not_full_; // 任务队列非满条件变量
-    std::condition_variable not_empty_;// 任务队列非空条件变量
+    std::mutex task_queue_mutex_;                   // 任务队列的互斥锁，保证任务列队的线程安全
+    std::condition_variable not_full_;              // 任务队列非满条件变量
+    std::condition_variable not_empty_;             // 任务队列非空条件变量
 
-    PoolMode pool_mode_;// 线程池的工作模式
+    PoolMode pool_mode_;                            // 线程池的工作模式
+    std::atomic_bool is_pool_running_;              // 表示当前线程池的启动状态，用于状态管理
 };
 
 
