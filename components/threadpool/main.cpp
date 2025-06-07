@@ -32,28 +32,32 @@ class Test {
 
 int main() {
 #if 1
-    ThreadPool pool;
-    // 用户自己设置线程池的工作模式
-    pool.SetMode(PoolMode::MODE_CACHED);
-    // 开始启动线程池
-    pool.Start(4);
-    Result res1 = pool.SubmitTask(std::make_shared<MyTask>(1, 1000000));
-    Result res2 = pool.SubmitTask(std::make_shared<MyTask>(1000001, 2000000));
-    Result res3 = pool.SubmitTask(std::make_shared<MyTask>(2000001, 3000000));
-    pool.SubmitTask(std::make_shared<MyTask>(2000001, 3000000));
+    // 问题：ThreadPool对象析构后，把线程池相关的线程资源全部回收
+    {
+        ThreadPool pool;
+        // 用户自己设置线程池的工作模式
+        pool.SetMode(PoolMode::MODE_CACHED);
+        // 开始启动线程池
+        pool.Start(4);
+        Result res1 = pool.SubmitTask(std::make_shared<MyTask>(1, 1000000));
+        Result res2 = pool.SubmitTask(std::make_shared<MyTask>(1000001, 2000000));
+        Result res3 = pool.SubmitTask(std::make_shared<MyTask>(2000001, 3000000));
+        pool.SubmitTask(std::make_shared<MyTask>(2000001, 3000000));
 
-    pool.SubmitTask(std::make_shared<MyTask>(2000001, 3000000));
-    pool.SubmitTask(std::make_shared<MyTask>(2000001, 3000000));
+        pool.SubmitTask(std::make_shared<MyTask>(2000001, 3000000));
+        pool.SubmitTask(std::make_shared<MyTask>(2000001, 3000000));
+        pool.SubmitTask(std::make_shared<MyTask>(2000001, 3000000));
 
-    ulong sum1 = res1.Get().Cast_<ulong>();
-    ulong sum2 = res2.Get().Cast_<ulong>();
-    ulong sum3 = res3.Get().Cast_<ulong>();
-    std::cout << "执行完成！" << std::endl;
-    // Master - Slave线程模型
-    // Master线程用来分解任务，然后给各个Slave线程分配任务
-    // 等待各个Slave线程执行完任务，返回结果
-    // Master线程合并各个任务结果，输出
-    std::cout << (sum1 + sum2 + sum3) << std::endl;
+        ulong sum1 = res1.Get().Cast_<ulong>();
+        ulong sum2 = res2.Get().Cast_<ulong>();
+        ulong sum3 = res3.Get().Cast_<ulong>();
+        std::cout << "执行完成！" << std::endl;
+        // Master - Slave线程模型
+        // Master线程用来分解任务，然后给各个Slave线程分配任务
+        // 等待各个Slave线程执行完任务，返回结果
+        // Master线程合并各个任务结果，输出
+        std::cout << (sum1 + sum2 + sum3) << std::endl;
+    }
 
 //    pool.SubmitTask(std::make_shared<MyTask>());
 //    pool.SubmitTask(std::make_shared<MyTask>());
@@ -67,6 +71,7 @@ int main() {
 //    pool.SubmitTask(std::make_shared<MyTask>());
     //    std::this_thread::sleep_for(std::chrono::seconds(5));
     getchar();
+    std::cout << "线程池被销毁了..." << std::endl;
 #else
     // 随着task被执行完，task对象没了，依赖于task对象的Result对象也销毁了
     std::cout << "Any类的大小: " << sizeof(Any) << std::endl;

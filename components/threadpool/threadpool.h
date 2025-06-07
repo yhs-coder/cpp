@@ -201,9 +201,11 @@ private:
     std::mutex task_queue_mutex_;                                   // 任务队列的互斥锁，保证任务列队的线程安全
     std::condition_variable not_full_;                              // 任务队列非满条件变量
     std::condition_variable not_empty_;                             // 任务队列非空条件变量
+    std::condition_variable exit_condition_;                        // 线程池析构时，等待线程资源全部回收
 
     PoolMode pool_mode_;                                            // 线程池的工作模式
     std::atomic_bool is_pool_running_;                              // 表示当前线程池的启动状态，用于状态管理
+
 };
 
 
