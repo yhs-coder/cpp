@@ -167,8 +167,8 @@ public:
     // 设置初始的线程数量
     void SetInitThreadSize(size_t size);
 
-    //  开启线程池
-    void Start(size_t init_thread_size = 4);
+    //  开启线程池, 获取计算机CPU数量
+    void Start(size_t init_thread_size = std::thread::hardware_concurrency());
 
     // 设置task任务队列上限阈值
     void SetTaskQueueThreshold(size_t threshold);
