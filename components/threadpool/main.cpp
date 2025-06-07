@@ -9,15 +9,15 @@ class MyTask : public Task {
 public:
     MyTask(int begin, int end) : begin_(begin), end_(end) {}
     Any Run() override {
-//        std::cout << "begin..." << std::endl;
+        std::cout << "begin..." << std::endl;
 //        std::cout << "thread id: " << std::this_thread::get_id() << std::endl;
-//        std::this_thread::sleep_for(std::chrono::seconds(5));
+        std::this_thread::sleep_for(std::chrono::seconds(3));
 //        std::cout << "end..." << std::endl;
         ulong sum = 0;
         for (int i = begin_; i < end_; i++) {
             sum += i;
         }
-        std::cout << "tid: " << std::this_thread::get_id() << "...." << std::endl;
+        std::cout << "tid: " << std::this_thread::get_id() << " end!...." << std::endl;
         std::cout << "sum = " << sum << std::endl;
         return sum;
     }
@@ -40,6 +40,10 @@ int main() {
     Result res1 = pool.SubmitTask(std::make_shared<MyTask>(1, 1000000));
     Result res2 = pool.SubmitTask(std::make_shared<MyTask>(1000001, 2000000));
     Result res3 = pool.SubmitTask(std::make_shared<MyTask>(2000001, 3000000));
+    pool.SubmitTask(std::make_shared<MyTask>(2000001, 3000000));
+
+    pool.SubmitTask(std::make_shared<MyTask>(2000001, 3000000));
+    pool.SubmitTask(std::make_shared<MyTask>(2000001, 3000000));
 
     ulong sum1 = res1.Get().Cast_<ulong>();
     ulong sum2 = res2.Get().Cast_<ulong>();

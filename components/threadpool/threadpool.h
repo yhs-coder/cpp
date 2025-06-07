@@ -122,15 +122,20 @@ private:
 class Thread {
 public:
     // 线程函数对象类型
-    using ThreadFunc = std::function<void()>;
+    using ThreadFunc = std::function<void(size_t)>;
     Thread(ThreadFunc func);
     ~Thread() = default;
 
     // 启动线程
     void Start();
 
+    // 获取Thread对象的id
+    size_t GetID() const;
+
 private:
     ThreadFunc func_;
+    static size_t generate_id_;   // 用于给每个id赋值
+    size_t thread_id_;            // 每个Thread对象唯一标识的id,用于寻找Thread对象
 };
 
 // 线程池支持的模式
@@ -176,28 +181,29 @@ public:
 
 private:
     // 定义线程函数
-    void ThreadEntry();
+    void ThreadEntry(size_t thread_id);
 
     // 检查线程池的运行状态
     bool CheckRunningState() const;
 
 private:
-    std::vector<std::unique_ptr<Thread>> threads_;  // 线程池中的线程列表
-    size_t init_thread_size_;                       // 初始的线程数量
-    std::atomic_uint idle_thread_size_;             // 记录空闲线程的数量
-    size_t thread_size_threshold_;                  // 线程数量上限阈值
-    std::atomic_uint current_thread_size_;          // 记录当前线程池中线程的总数量
+//    std::vector<std::unique_ptr<Thread>> threads_;                // 线程池中的线程列表
+    std::unordered_map<size_t, std::unique_ptr<Thread>>threads_;    // 线程池中的线程列表
+    size_t init_thread_size_;                                       // 初始的线程数量
+    std::atomic_uint idle_thread_size_;                             // 记录空闲线程的数量
+    size_t thread_size_threshold_;                                  // 线程数量上限阈值
+    std::atomic_uint current_thread_size_;                          // 记录当前线程池中线程的总数量
 
-    std::queue<std::shared_ptr<Task>> task_queue_;  // 任务队列,使用智能指针管理传入的对象，自动释放资源
-    std::atomic_uint task_size_;                    // 任务数量
-    size_t task_queue_threshold_;                   // 任务队列的阈值
+    std::queue<std::shared_ptr<Task>> task_queue_;                  // 任务队列,使用智能指针管理传入的对象，自动释放资源
+    std::atomic_uint task_size_;                                    // 任务数量
+    size_t task_queue_threshold_;                                   // 任务队列的阈值
 
-    std::mutex task_queue_mutex_;                   // 任务队列的互斥锁，保证任务列队的线程安全
-    std::condition_variable not_full_;              // 任务队列非满条件变量
-    std::condition_variable not_empty_;             // 任务队列非空条件变量
+    std::mutex task_queue_mutex_;                                   // 任务队列的互斥锁，保证任务列队的线程安全
+    std::condition_variable not_full_;                              // 任务队列非满条件变量
+    std::condition_variable not_empty_;                             // 任务队列非空条件变量
 
-    PoolMode pool_mode_;                            // 线程池的工作模式
-    std::atomic_bool is_pool_running_;              // 表示当前线程池的启动状态，用于状态管理
+    PoolMode pool_mode_;                                            // 线程池的工作模式
+    std::atomic_bool is_pool_running_;                              // 表示当前线程池的启动状态，用于状态管理
 };
 
 
