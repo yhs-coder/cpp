@@ -103,7 +103,8 @@ void ThreadPool::ThreadEntry(size_t thread_id) {
 
             // cached模式下，可能已经创建了很多线程，如果空闲时间超过60s,应该把多余的线程结束回收掉
             // 超过init_thread_size_数量的空闲线程才需要进行回收
-            while (task_queue_.empty()) {
+            // 锁 + 双重判断
+            while (is_pool_running_ && task_queue_.empty()) {
                 // cached模式下，可能已经创建了很多线程，如果空闲时间超过60s,应该把多余的线程结束回收掉
                 // 超过init_thread_size_数量的空闲线程才需要进行回收
                 if (pool_mode_ == PoolMode::MODE_CACHED) {
@@ -130,16 +131,18 @@ void ThreadPool::ThreadEntry(size_t thread_id) {
                 }
                 // 线程池要结束了，回收线程资源
                 // 回收线程时的情况：线程处于等待状态被唤醒
-                if (!is_pool_running_) {
+                /*if (!is_pool_running_) {
                     threads_.erase(thread_id);
                     std::cout << "threadid: " << std::this_thread::get_id() << " exit..." << std::endl;
                     // 唤醒ThreadPool析构函数上等待的条件变量
                     exit_condition_.notify_all();
                     // 删除线程后，无须在向下执行，直接返回
                     return;
-                }
+                }*/
             }
-
+            if (!is_pool_running_) {
+                break;
+            }
             // 需要线程处理，空闲线程数量--
             idle_thread_size_--;
             std::cout << "tid: " << std::this_thread::get_id() << "获取任务成功..." << std::endl;
