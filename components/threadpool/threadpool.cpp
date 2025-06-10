@@ -93,8 +93,8 @@ void ThreadPool::ThreadEntry(size_t thread_id) {
 
     // 记录线程开始执行的时间
     auto last_time = std::chrono::high_resolution_clock::now();
-    // 根据线程池状态，选择是否循环处理任务队列上的任务
-    while (is_pool_running_) {
+    // 所有任务必须执行完成，线程池才可以回收所有线程资源
+    for (;;) {
         std::shared_ptr<Task> task;
         {
             // 获取锁
@@ -104,7 +104,15 @@ void ThreadPool::ThreadEntry(size_t thread_id) {
             // cached模式下，可能已经创建了很多线程，如果空闲时间超过60s,应该把多余的线程结束回收掉
             // 超过init_thread_size_数量的空闲线程才需要进行回收
             // 锁 + 双重判断
-            while (is_pool_running_ && task_queue_.empty()) {
+            while (task_queue_.empty()) {
+                // 线程池要结束，回收线程资源
+                if (!is_pool_running_) {
+                    // 线程池要结束了，回收线程资源
+                    threads_.erase(thread_id);
+                    std::cout << "threadid: " << std::this_thread::get_id() << " exit..." << std::endl;
+                    // 唤醒ThreadPool析构函数上等待的条件变量
+                    exit_condition_.notify_all();
+                }
                 // cached模式下，可能已经创建了很多线程，如果空闲时间超过60s,应该把多余的线程结束回收掉
                 // 超过init_thread_size_数量的空闲线程才需要进行回收
                 if (pool_mode_ == PoolMode::MODE_CACHED) {
@@ -140,9 +148,6 @@ void ThreadPool::ThreadEntry(size_t thread_id) {
                     return;
                 }*/
             }
-            if (!is_pool_running_) {
-                break;
-            }
             // 需要线程处理，空闲线程数量--
             idle_thread_size_--;
             std::cout << "tid: " << std::this_thread::get_id() << "获取任务成功..." << std::endl;
@@ -173,13 +178,6 @@ void ThreadPool::ThreadEntry(size_t thread_id) {
         // 更新线程执行完任务的时间
         last_time = std::chrono::high_resolution_clock::now();
     }
-
-    // 线程池要结束了，回收线程资源
-    // 回收线程时的情况：任务到这执行完任务
-    threads_.erase(thread_id);
-    std::cout << "threadid: " << std::this_thread::get_id() << " exit..." << std::endl;
-    // 唤醒ThreadPool析构函数上等待的条件变量
-    exit_condition_.notify_all();
 }
 
 bool ThreadPool::CheckRunningState() const {

@@ -10,9 +10,9 @@ public:
     MyTask(int begin, int end) : begin_(begin), end_(end) {}
     Any Run() override {
         std::cout << "begin..." << std::endl;
-//        std::cout << "thread id: " << std::this_thread::get_id() << std::endl;
+        //        std::cout << "thread id: " << std::this_thread::get_id() << std::endl;
         std::this_thread::sleep_for(std::chrono::seconds(3));
-//        std::cout << "end..." << std::endl;
+        //        std::cout << "end..." << std::endl;
         ulong sum = 0;
         for (int i = begin_; i < end_; i++) {
             sum += i;
@@ -21,17 +21,17 @@ public:
         std::cout << "sum = " << sum << std::endl;
         return sum;
     }
+
 private:
     int begin_;
     int end_;
 };
 
 class Test {
-
 };
 
 int main() {
-#if 1
+#if 0
     // 问题：ThreadPool对象析构后，把线程池相关的线程资源全部回收
     {
         ThreadPool pool;
@@ -74,7 +74,22 @@ int main() {
     std::cout << "线程池被销毁了..." << std::endl;
 #else
     // 随着task被执行完，task对象没了，依赖于task对象的Result对象也销毁了
-    std::cout << "Any类的大小: " << sizeof(Any) << std::endl;
+    //    std::cout << "Any类的大小: " << sizeof(Any) << std::endl;
+    {
+        // 系统处理器CPU数量
+        std::cout << "CPU size: " << std::thread::hardware_concurrency() << std::endl;
+        ThreadPool pool;
+        // 开始启动线程池
+        pool.Start(4);
+        Result res1 = pool.SubmitTask(std::make_shared<MyTask>(1, 1000000));
+        pool.SubmitTask(std::make_shared<MyTask>(2000001, 3000000));
+        pool.SubmitTask(std::make_shared<MyTask>(2000001, 3000000));
+        pool.SubmitTask(std::make_shared<MyTask>(2000001, 3000000));
+        pool.SubmitTask(std::make_shared<MyTask>(2000001, 3000000));
+        ulong sum1 = res1.Get().Cast_<ulong>();
+        std::cout << "sum1: " << sum1 << std::endl;
+    }
+    std::cout << "main over!" << std::endl;
 
 #endif
     return 0;
