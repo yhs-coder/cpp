@@ -32,7 +32,7 @@ class Test {
 
 int main() {
 #if 0
-    // 问题：ThreadPool对象析构后，把线程池相关的线程资源全部回收
+    // ThreadPool对象析构后，把线程池相关的线程资源全部回收
     {
         ThreadPool pool;
         // 用户自己设置线程池的工作模式
@@ -69,9 +69,9 @@ int main() {
 //    pool.SubmitTask(std::make_shared<MyTask>());
 //    pool.SubmitTask(std::make_shared<MyTask>());
 //    pool.SubmitTask(std::make_shared<MyTask>());
-    //    std::this_thread::sleep_for(std::chrono::seconds(5));
-    getchar();
-    std::cout << "线程池被销毁了..." << std::endl;
+//    std::this_thread::sleep_for(std::chrono::seconds(5));
+      getchar();
+      std::cout << "线程池被销毁了..." << std::endl;
 #else
     // 随着task被执行完，task对象没了，依赖于task对象的Result对象也销毁了
     //    std::cout << "Any类的大小: " << sizeof(Any) << std::endl;
