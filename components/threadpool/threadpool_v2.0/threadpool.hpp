@@ -14,7 +14,7 @@
 #include <thread>
 #include <vector>
 
-const size_t TASK_MAX_THRESHOLD = INT32_MAX;
+const size_t TASK_MAX_THRESHOLD = 2; //INT32_MAX;
 const size_t THREAD_MAX_THRESHOLD = 100;
 const size_t THREAD_MAX_IDLE_TIME = 60;// 单位是秒
 
@@ -151,21 +151,63 @@ public:
 
     // 往线程池中提交任务
     template<typename Func, typename... Args>
-    auto SubmitTask(Func&& func, Args&&... args) -> std::future<decltype(func(args...))> {
+    auto SubmitTask(Func &&func, Args &&...args) -> std::future<decltype(func(args...))> {
+        // 定义返回值类型别名
+        using RType = decltype(func(args...));
+        auto task = std::make_shared<std::packaged_task<RType()>>(
+                std::bind(std::forward<Func>(func), std::forward<Args>(args)...));
+        std::future<RType> result = task->get_future();
 
+        // 获取锁，搭配条件变量对任务列队进行操作
+        std::unique_lock<std::mutex> lock(task_queue_mutex_);
+        // 用户提交任务最长不能阻塞超过1秒， 否则判断提交任务失败，直接返回
+        // 如果不满足条件，则会一直等待，并且将锁释放
+        if (!not_full_.wait_for(lock, std::chrono::seconds(1), [&]() -> bool { return task_queue_.size() < task_queue_threshold_; })) {
+            // 表示not_full_等待了1s后，条件依旧没有满足
+            std::cerr << "The task queue is full, submit task failed." << std::endl;
+            auto error_task = std::make_shared<std::packaged_task<RType()>>(
+                    []() -> RType { return RType(); });
+            (*error_task)();
+            return error_task->get_future();
+        }
+
+        // 如果有空余，将传入的任务插入到任务队列
+        // 创建一个lambda表达式作为中间层，在其调用时执行(*task)()，也就是调用函数
+        task_queue_.emplace([task]{ (*task)(); });
+        task_size_++;
+
+        // 插入后任务队列非空，在not_empty_上通知线程池分配线程来处理该任务
+        not_empty_.notify_all();
+
+        // cached模式，使用场景：适合任务处理比较紧急，小而快的任务。
+        // 但不适合耗时多的任务，因为耗时任务会长时间占用线程，这种情况选择fixed模式
+        // 需要根据任务数量和空闲线程的数量，判断是否需要创建新的线程出来
+        if (pool_mode_ == PoolMode::MODE_CACHED && task_size_ > idle_thread_size_ && current_thread_size_ < thread_size_threshold_) {
+            std::cout << ">>> create new thread..." << std::endl;
+
+            auto ptr = std::make_unique<Thread>(std::bind(&ThreadPool::ThreadEntry, this, std::placeholders::_1));
+            //        threads_.emplace_back(std::move(ptr));
+            size_t thread_id = ptr->GetID();
+            threads_.emplace(thread_id, std::move(ptr));
+            // 启动线程，内部创建新的线程对象
+            threads_[thread_id]->Start();
+            // 修改线程个数相关的变量
+            current_thread_size_++;
+            idle_thread_size_++;
+        }
+
+        // 返回任务的Result对象
+        return result;
     }
 
 private:
     // 定义线程函数
     void ThreadEntry(size_t thread_id) {
-        //    std::cout << "begin ThreadEntry..." << std::endl;
-        //    std::cout << "thread id: " << std::this_thread::get_id() << std::endl;
-
         // 记录线程开始执行的时间
         auto last_time = std::chrono::high_resolution_clock::now();
         // 所有任务必须执行完成，线程池才可以回收所有线程资源
         for (;;) {
-            std::shared_ptr<Task> task;
+            Task task;
             {
                 // 获取锁
                 std::unique_lock<std::mutex> lock(task_queue_mutex_);
@@ -182,6 +224,8 @@ private:
                         std::cout << "threadid: " << std::this_thread::get_id() << " exit..." << std::endl;
                         // 唤醒ThreadPool析构函数上等待的条件变量
                         exit_condition_.notify_all();
+                        // 线程函数结束，线程结束
+                        return;
                     }
                     // cached模式下，可能已经创建了很多线程，如果空闲时间超过60s,应该把多余的线程结束回收掉
                     // 超过init_thread_size_数量的空闲线程才需要进行回收
@@ -207,16 +251,6 @@ private:
                         // 等待not_empty_上的条件满足
                         not_empty_.wait(lock);
                     }
-                    // 线程池要结束了，回收线程资源
-                    // 回收线程时的情况：线程处于等待状态被唤醒
-                    /*if (!is_pool_running_) {
-                    threads_.erase(thread_id);
-                    std::cout << "threadid: " << std::this_thread::get_id() << " exit..." << std::endl;
-                    // 唤醒ThreadPool析构函数上等待的条件变量
-                    exit_condition_.notify_all();
-                    // 删除线程后，无须在向下执行，直接返回
-                    return;
-                }*/
                 }
                 // 需要线程处理，空闲线程数量--
                 idle_thread_size_--;
@@ -239,8 +273,7 @@ private:
 
             // 任务非空时，当前线程才执行这个任务
             if (task != nullptr) {
-                // task->Run();
-                task->Exec();
+                task();
             }
             // 当线程处理完任务，空闲线程数量++
             idle_thread_size_++;
@@ -265,7 +298,7 @@ private:
     std::atomic_uint current_thread_size_;                       // 记录当前线程池中线程的总数量
 
     using Task = std::function<void()>;
-    std::queue<std::shared_ptr<Task>> task_queue_;// 任务队列,使用智能指针管理传入的对象，自动释放资源
+    std::queue<Task> task_queue_;// 任务队列,使用智能指针管理传入的对象，自动释放资源
     std::atomic_uint task_size_;                  // 任务数量
     size_t task_queue_threshold_;                 // 任务队列的阈值
 
