@@ -2,22 +2,15 @@
 #include <iostream>
 #include <thread>
 #include <future>
+#include "threadpool.hpp"
 
-/*
- * 如何让线程池提交任务更加方便?
- * 1. 能够将提交任务设置成类似线程对象创建那般的做法，每个函数表示一个任务
- * 2. 为了能够接收任意个数的参数 -> 使用可变参数模板编程
- * pool.SubmitTask(sum1, 1, 1)
- *
- * 3.使用 packaged_task(function函数对象) 打包任务
- *   使用std::future来代替原先的Result，用它来保存任务执行完的结果
- * */
 
 int sum1(int a, int b) {
-    std::this_thread::sleep_for(std::chrono::seconds(5));
+    std::this_thread::sleep_for(std::chrono::seconds(2));
     return a + b;
 }
 int sum2(int a, int b, int c) {
+    std::this_thread::sleep_for(std::chrono::seconds(2));
     return a + b + c;
 }
 
@@ -45,6 +38,28 @@ void test2() {
 
 int main() {
 //    test();
-    test2();
+//    test2();
+
+    // 测试线程池
+    ThreadPool pool;
+//    pool.SetMode(PoolMode::MODE_CACHED);
+    pool.Start(2);
+
+    std::future<int> r1 = pool.SubmitTask(sum1, 10, 10);
+    std::future<int> r2 = pool.SubmitTask(sum2, 10, 10, 10);
+    std::future<int> r3 = pool.SubmitTask([](int a, int b) ->int{
+        int sum = 0;
+        for (int i = a; i <= b; i++) {
+            sum += i;
+        }
+        return sum;
+    }, 1, 100);
+    std::future<int> r4 = pool.SubmitTask(sum2, 10, 20, 30);
+    std::future<int> r5 = pool.SubmitTask(sum2, 30, 30, 30);
+    std::cout  << r1.get() << std::endl;
+    std::cout  << r2.get() << std::endl;
+    std::cout  << r3.get() << std::endl;
+    std::cout  << r4.get() << std::endl;
+    std::cout  << r5.get() << std::endl;
     return 0;
 }
