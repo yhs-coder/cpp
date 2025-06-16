@@ -76,33 +76,34 @@ public:
 class AbstractFactory {
 public:
     // 工厂方法，创建汽车
-    virtual Car *create_car(std::string name) = 0;
+    virtual std::unique_ptr<Car> create_car(std::string name) = 0;
     // 工厂方法，创建汽车关联产品，车灯
-    virtual Light *create_light() = 0;
+    virtual std::unique_ptr<Light> create_light() = 0;
 };
 
 // 具体的工厂类创建具体的产品
 
 class TeslaFactory : public AbstractFactory {
 public:
-    Car *create_car(std::string name) override {
-        return new Tesla(name);
+    std::unique_ptr<Car> create_car(std::string name) override {
+        return std::make_unique<Tesla>(name);
     }
 
-    Light *create_light() override {
-        return new TeslaLight;
+    std::unique_ptr<Light>create_light() override {
+        return std::make_unique<TeslaLight>();
     }
 };
 
 class AudiFactory : public AbstractFactory {
 public:
-    Car *create_car(std::string name) override {
-        return new Audi(name);
+    std::unique_ptr<Car>create_car(std::string name) override {
+        return std::make_unique<Audi>(name);
     }
-    Light *create_light() override {
-        return new AudiLight;
+    std::unique_ptr<Light>create_light() override {
+        return std::make_unique<AudiLight>();
     }
 };
+
 int main() {
     std::unique_ptr<AbstractFactory> tesla_factory(new TeslaFactory());
     std::unique_ptr<AbstractFactory> audi_factory(new AudiFactory());
