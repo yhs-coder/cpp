@@ -1,5 +1,6 @@
 #include <iostream>
 #include <list>
+#include <memory>
 #include <string>
 #include <unordered_map>
 
@@ -30,7 +31,7 @@ protected:
 // 一个具体的监听者类Listener1
 class Listener1 : public Listener {
 public:
-    Listener1(std::string name) : Listener(name){}
+    Listener1(std::string name) : Listener(name) {}
     // Listener1处理自己感兴趣的事件
     void handle_message(int msgid) override {
         std::cout << "listener: " << name_ << " recv:" << msgid
@@ -40,7 +41,7 @@ public:
 // 一个具体的监听者类Listener2
 class Listener2 : public Listener {
 public:
-    Listener2(std::string name) : Listener(name){}
+    Listener2(std::string name) : Listener(name) {}
 
     // Listener2处理自己感兴趣的事件
     void handle_message(int msgid) override {
@@ -60,6 +61,15 @@ public:
 	*/
     void register_listener(Listener *listener, int msgid) {
         listener_map_[msgid].push_back(listener);
+        /* 同等写法，但上述写法更简洁高效
+        auto it = listener_map_.find(msgid);
+        if (it != listener_map_.end()) {
+            it->second.push_back(listener);
+        } else {
+            std::list<Listener*> tmp;
+            tmp.push_back(listener);
+            listener_map_.insert({msgid, std::move(tmp)});
+        }*/
     }
 
     /*
@@ -70,8 +80,10 @@ public:
 	*/
     void dispatch_message(int msgid) {
         auto it = listener_map_.find(msgid);
+        // 发现该事件有监听者注册
         if (it != listener_map_.end()) {
-            for (auto listener : it->second) {
+            for (auto listener: it->second) {
+                // 通知所有对该事件感兴趣的监听者区去处理
                 listener->handle_message(msgid);
             }
         }
@@ -84,10 +96,27 @@ private:
 };
 
 int main() {
-    Listener *p1 = new Listener1("流量分析模块");
-    Listener *p2 = new Listener2("流量统计模块");
+    std::unique_ptr<Listener> p1(new Listener1("流量分析模块"));
+    std::unique_ptr<Listener> p2(new Listener2("流量统计模块"));
 
     Observer obser;
+    // 监听者p1注册1，2，3事件
+    obser.register_listener(p1.get(), 1);
+    obser.register_listener(p1.get(), 2);
+    obser.register_listener(p1.get(), 3);
+    // 监听者p2注册1，3事件
+    obser.register_listener(p2.get(), 1);
+    obser.register_listener(p2.get(), 3);
 
+    // 模拟事件的发生
+    int msgid = -1;
+    for (;;) {
+        std::cout << "输入事件id: ";
+        std::cin >> msgid;
+        if (msgid == -1) {
+            break;
+        }
+        obser.dispatch_message(msgid);
+    }
     return 0;
 }
