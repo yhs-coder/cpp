@@ -2,6 +2,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <thread>
 #include <unordered_map>
 
 /*
@@ -42,7 +43,7 @@ public:
 class Listener2 : public Listener {
 public:
     Listener2(std::string name) : Listener(name) {}
-
+    ~Listener2() { std::cout << "~Listener2..." << std::endl; }
     // Listener2处理自己感兴趣的事件
     void handle_message(int msgid) override {
         std::cout << "listener: " << name_ << " recv:" << msgid
@@ -59,7 +60,7 @@ public:
 	2. int msgid： 监听者感兴趣的事件
 	该函数接口主要用于 监听者向观察者注册感兴趣的事件
 	*/
-    void register_listener(Listener *listener, int msgid) {
+    void register_listener(std::weak_ptr<Listener> listener, int msgid) {
         listener_map_[msgid].push_back(listener);
         /* 同等写法，但上述写法更简洁高效
         auto it = listener_map_.find(msgid);
@@ -82,34 +83,77 @@ public:
         auto it = listener_map_.find(msgid);
         // 发现该事件有监听者注册
         if (it != listener_map_.end()) {
-            for (auto listener: it->second) {
-                // 通知所有对该事件感兴趣的监听者区去处理
-                listener->handle_message(msgid);
+            // 遍历对该事件感兴趣的监听者的链表
+            for (auto it1 = it->second.begin(); it1 != it->second.end();) {
+                // 智能指针的提升操作，用来判断监听者对象是否存活
+                std::shared_ptr<Listener> ps = it1->lock();
+                if (ps != nullptr) {
+                    ps->handle_message(msgid);
+                    it1++;
+                } else {
+                    std::cout << "删除已经失效的监听者..." << std::endl;
+                    // 监听者对象已经析构，从map中删除这样的监听者对象
+                    it1 = it->second.erase(it1);
+                }
             }
+            //            for (auto listener: it->second) {
+            //                // 通知所有对该事件感兴趣的监听者区去处理
+            //                listener->handle_message(msgid);
+            //            }
         }
     }
 
-
 private:
     // 存储监听者注册的感兴趣的事件
-    std::unordered_map<int, std::list<Listener *>> listener_map_;
+    std::unordered_map<int, std::list<std::weak_ptr<Listener>>> listener_map_;
 };
 
 int main() {
-    std::unique_ptr<Listener> p1(new Listener1("流量分析模块"));
-    std::unique_ptr<Listener> p2(new Listener2("流量统计模块"));
-
+    std::shared_ptr<Listener> p1(new Listener1("流量分析模块"));
+    std::shared_ptr<Listener> p2(new Listener2("流量统计模块"));
     Observer obser;
     // 监听者p1注册1，2，3事件
-    obser.register_listener(p1.get(), 1);
-    obser.register_listener(p1.get(), 2);
-    obser.register_listener(p1.get(), 3);
+    obser.register_listener(p1, 1);
+    obser.register_listener(p1, 2);
+    obser.register_listener(p1, 3);
     // 监听者p2注册1，3事件
-    obser.register_listener(p2.get(), 1);
-    obser.register_listener(p2.get(), 3);
+    obser.register_listener(p2, 1);
+    obser.register_listener(p2, 2);
+
 
     // 模拟事件的发生
     int msgid = -1;
+    std::thread t1([&obser]() {
+        while (true) {
+            std::this_thread::sleep_for(std::chrono::seconds(3));
+            obser.dispatch_message(1);
+        }
+    });
+
+    std::thread t2([&obser]() {
+        while (true) {
+            std::this_thread::sleep_for(std::chrono::seconds(4));
+            obser.dispatch_message(2);
+        }
+    });
+
+    std::thread t3([&obser]() {
+        while (true) {
+            std::this_thread::sleep_for(std::chrono::seconds(5));
+            obser.dispatch_message(3);
+        }
+    });
+    {
+        // 监听者出作用域后自动销毁
+        std::shared_ptr<Listener> p3(new Listener2("流量捕获模块"));
+        obser.register_listener(p3, 3);
+        obser.register_listener(p2, 3);
+        std::this_thread::sleep_for(std::chrono::seconds(15));
+    }
+
+    t1.join();
+    t2.join();
+    t3.join(); /*
     for (;;) {
         std::cout << "输入事件id: ";
         std::cin >> msgid;
@@ -117,6 +161,6 @@ int main() {
             break;
         }
         obser.dispatch_message(msgid);
-    }
+    }*/
     return 0;
 }
